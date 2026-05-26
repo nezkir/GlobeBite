@@ -1,0 +1,1 @@
+Same as Backend 1 — get MySQL and Qt set up and make sure the two can talk to each other on your machine. Your side of the backend will be more about the logic like search, filtering and exporting data rather than raw database queries, but no need to worry about specifics yet. Just get the environment ready.
