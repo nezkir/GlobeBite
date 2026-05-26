@@ -1,0 +1,2 @@
+Your job is purely the MySQL database. Right now your task is to understand the project from the HTML prototype and start thinking about what tables we need and what data goes in them. We already have a starting schema so go through it, understand each table and why it exists, and start thinking about what sample data we'll need for testing.
+
