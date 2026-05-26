@@ -1,0 +1,1 @@
+You're on the backend side meaning you'll be dealing with the database and data side of things. For now get MySQL installed and set up on your machine, make sure you can connect to it and run basic queries. Also get familiar with how Qt connects to MySQL using the QMYSQL driver. We'll assign specific queries and logic once frontend has something to connect to.
