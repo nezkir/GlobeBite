@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GlobeBite — Interactive</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0E0B08;--bg2:#161210;--bg3:#1E1814;--bg4:#261E18;
+  --border:rgba(255,200,120,0.1);--border2:rgba(255,200,120,0.2);
+  --gold:#C8922A;--gold2:#E8B04A;--gold-dim:rgba(200,146,42,0.13);
+  --cream:#F5ECD7;--cream2:#D4C4A0;--muted:#7A6A54;
+  --red:#C94B1E;--green:#4A7A5C;--text:#EDE4D0;--text2:#A89878;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg)}body{position:relative}
+body{font-family:'Outfit',sans-serif;color:var(--text);display:flex;flex-direction:column}
+
+/* TITLEBAR */
+.titlebar{height:36px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;user-select:none;}
+.dots{display:flex;gap:6px}
+.dot{width:12px;height:12px;border-radius:50%;cursor:default}
+.dot-r{background:#E24B4A}.dot-y{background:#EF9F27}.dot-g{background:#3FB950}
+.win-title{flex:1;text-align:center;font-size:12px;color:var(--muted);letter-spacing:.05em}
+.win-title span{color:var(--gold);font-family:'Cormorant Garamond',serif;font-size:14px;font-weight:600}
+
+/* SPLASH */
+#splash{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;background:var(--bg);position:relative;overflow:hidden;}
+.splash-ring{position:absolute;border-radius:50%;border:1px solid rgba(200,146,42,0.06);animation:ringPulse 8s ease-in-out infinite;}
+.splash-ring:nth-child(1){width:600px;height:600px;top:50%;left:50%;transform:translate(-50%,-50%);animation-delay:0s}
+.splash-ring:nth-child(2){width:800px;height:800px;top:50%;left:50%;transform:translate(-50%,-50%);animation-delay:2s}
+.splash-ring:nth-child(3){width:1000px;height:1000px;top:50%;left:50%;transform:translate(-50%,-50%);animation-delay:4s}
+@keyframes ringPulse{0%,100%{opacity:.4}50%{opacity:.9}}
+#splashGlobeCanvas{position:relative;z-index:2;border-radius:50%;box-shadow:0 0 60px rgba(200,146,42,0.2),inset 0 0 40px rgba(0,0,0,0.4);animation:globeFloat 6s ease-in-out infinite;}
+@keyframes globeFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+.splash-text{position:relative;z-index:2;text-align:center;margin-top:28px}
+.splash-logo{font-family:'Cormorant Garamond',serif;font-size:54px;font-weight:700;color:var(--cream);letter-spacing:-.02em;line-height:1}
+.splash-logo em{color:var(--gold);font-style:italic}
+.splash-tagline{font-size:13px;color:var(--text2);font-weight:300;letter-spacing:.14em;text-transform:uppercase;margin-top:10px}
+.splash-enter{margin-top:36px;position:relative;z-index:2;background:var(--gold);color:var(--bg);border:none;border-radius:2px;padding:13px 52px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:'Outfit',sans-serif;transition:background .2s,transform .15s;}
+.splash-enter:hover{background:var(--gold2);transform:translateY(-2px)}
+.splash-meta{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);letter-spacing:.06em;z-index:2}
+
+/* MAIN APP */
+#app{flex:1;display:none;overflow:hidden;flex-direction:column}
+#app.show{display:flex}
+.app-body{flex:1;display:grid;grid-template-columns:220px 1fr;overflow:hidden;min-height:0}
+
+/* SIDEBAR */
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sb-brand{padding:18px 16px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sb-logo{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;color:var(--cream)}
+.sb-logo em{color:var(--gold);font-style:italic}
+.sb-badge{font-size:9px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-left:auto;background:var(--bg3);padding:3px 7px;border-radius:2px;border:1px solid var(--border)}
+.sb-search{padding:10px 12px;border-bottom:1px solid var(--border)}
+.search-wrap{display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:2px;padding:7px 10px}
+.search-wrap svg{width:13px;height:13px;stroke:var(--muted);flex-shrink:0}
+.search-wrap input{background:transparent;border:none;outline:none;font-size:12px;color:var(--text);font-family:'Outfit',sans-serif;width:100%}
+.search-wrap input::placeholder{color:var(--muted)}
+.sb-section-label{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 16px 6px}
+.country-list{flex:1;overflow-y:auto;padding-bottom:8px}
+.country-list::-webkit-scrollbar{width:3px}
+.country-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.country-row{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;transition:background .15s;border-left:2px solid transparent}
+.country-row:hover{background:var(--bg3)}
+.country-row.active{background:var(--gold-dim);border-left-color:var(--gold)}
+.c-flag{font-size:18px;line-height:1;flex-shrink:0}
+.c-info{min-width:0}
+.c-name{font-size:13px;color:var(--text);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.country-row.active .c-name{color:var(--gold2);font-weight:500}
+.c-count{font-size:10px;color:var(--muted);margin-top:1px}
+.sb-footer{border-top:1px solid var(--border);padding:10px 16px;display:flex;flex-direction:column;gap:6px}
+.sb-btn{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:2px;font-size:12px;color:var(--text2);cursor:pointer;background:transparent;border:1px solid var(--border);font-family:'Outfit',sans-serif;transition:background .15s,color .15s}
+.sb-btn:hover{background:var(--bg3);color:var(--text)}
+.sb-btn svg{width:13px;height:13px;stroke:currentColor;flex-shrink:0}
+
+/* MAP AREA — contains both globe view and flat map view */
+.map-area{background:var(--bg);display:flex;flex-direction:column;overflow:hidden;position:relative}
+.toolbar{background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;padding:7px 12px;flex-shrink:0}
+.tb-btn{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:2px;border:1px solid var(--border);background:var(--bg3);font-size:11px;color:var(--text2);cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s;white-space:nowrap}
+.tb-btn:hover{border-color:var(--border2);color:var(--text);background:var(--bg4)}
+.tb-btn svg{width:12px;height:12px;stroke:currentColor;flex-shrink:0}
+.tb-sep{width:1px;height:16px;background:var(--border);margin:0 3px}
+.tb-right{margin-left:auto;display:flex;gap:6px}
+.tb-btn.accent{border-color:rgba(200,146,42,0.35);color:var(--gold);background:var(--gold-dim)}
+.tb-btn.accent:hover{background:rgba(200,146,42,0.22)}
+.tb-btn.active-view{border-color:rgba(200,146,42,0.5);color:var(--gold2);background:rgba(200,146,42,0.18)}
+
+/* GLOBE VIEW */
+#globeView{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:grab}
+#globeView:active{cursor:grabbing}
+#globeCanvas{display:block}
+.map-hint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(14,11,8,0.85);border:1px solid var(--border);border-radius:2px;padding:7px 16px;font-size:11px;color:var(--text2);letter-spacing:.05em;pointer-events:none;transition:opacity .3s;}
+.country-tooltip{position:absolute;background:rgba(14,11,8,0.92);border:1px solid var(--border2);border-radius:3px;padding:7px 12px;font-size:12px;color:var(--text);pointer-events:none;display:none;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,0.5);}
+.globe-controls{position:absolute;bottom:16px;right:16px;display:flex;flex-direction:column;gap:4px;z-index:5;}
+.globe-ctrl-btn{width:28px;height:28px;background:var(--bg2);border:1px solid var(--border);border-radius:2px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:14px;transition:all .15s;}
+.globe-ctrl-btn:hover{background:var(--bg3);color:var(--gold);border-color:var(--border2)}
+
+/* FLAT MAP VIEW */
+#flatMapView{flex:1;position:relative;display:none;overflow:hidden;flex-direction:column;}
+#flatMapView.visible{display:flex}
+.flat-map-wrap{flex:1;position:relative;overflow:hidden;cursor:default}
+#worldMapSvg{width:100%;height:100%;display:block}
+
+/* SVG country styles */
+.land{fill:#1a2a1a;stroke:#0E0B08;stroke-width:0.5;transition:fill .2s,stroke .2s;}
+.land:hover{fill:#2a3d2a;stroke:rgba(200,146,42,0.4);stroke-width:1;cursor:pointer}
+.land.has-data{fill:#1e3520;stroke:#2a4a2a;stroke-width:0.7}
+.land.has-data:hover{fill:rgba(200,146,42,0.25);stroke:var(--gold);stroke-width:1.5;cursor:pointer;filter:drop-shadow(0 0 6px rgba(200,146,42,0.4))}
+.land.selected{fill:rgba(200,146,42,0.35) !important;stroke:var(--gold2) !important;stroke-width:2 !important;filter:drop-shadow(0 0 8px rgba(200,146,42,0.6))}
+.graticule{fill:none;stroke:rgba(200,146,42,0.04);stroke-width:0.5}
+.sphere-bg{fill:#071628}
+
+/* Country name labels on map */
+.country-label{font-family:'Outfit',sans-serif;font-size:10px;fill:var(--gold2);pointer-events:none;opacity:0.9;font-weight:500}
+
+/* Pulsing dot on flat map */
+.map-dot{animation:mapDotPulse 2s ease-in-out infinite}
+@keyframes mapDotPulse{0%,100%{r:5;opacity:0.9}50%{r:8;opacity:0.5}}
+.map-dot-ring{animation:mapRingPulse 2s ease-in-out infinite}
+@keyframes mapRingPulse{0%{r:8;opacity:0.7;stroke-width:2}100%{r:18;opacity:0;stroke-width:1}}
+
+/* Country detail overlay (zoom-in on flat map) */
+#countryDetailOverlay{
+  position:absolute;inset:0;background:var(--bg);
+  display:none;flex-direction:column;
+  opacity:0;transition:opacity .3s ease;z-index:20;
+}
+#countryDetailOverlay.visible{display:flex}
+#countryDetailOverlay.shown{opacity:1}
+
+.overlay-header{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 18px;background:var(--bg2);border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.back-btn{
+  display:flex;align-items:center;gap:6px;padding:5px 12px;
+  border:1px solid var(--border);border-radius:2px;background:var(--bg3);
+  font-size:11px;color:var(--text2);cursor:pointer;font-family:'Outfit',sans-serif;
+  transition:all .15s;
+}
+.back-btn:hover{border-color:var(--border2);color:var(--gold);background:var(--bg4)}
+.back-btn svg{width:12px;height:12px;stroke:currentColor}
+.overlay-country-name{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;color:var(--cream)}
+.overlay-flag{font-size:28px}
+.overlay-body{flex:1;display:grid;grid-template-columns:1fr 1fr;overflow:hidden}
+
+/* Zoomed country SVG map */
+.country-map-panel{background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.country-map-bg{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(200,146,42,0.04) 0%,transparent 70%)}
+#countryMapSvg{max-width:100%;max-height:100%;filter:drop-shadow(0 0 30px rgba(200,146,42,0.2))}
+.country-map-label{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.country-map-info{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:16px}
+.cmi-item{text-align:center}
+.cmi-val{font-size:20px;font-family:'Cormorant Garamond',serif;font-weight:700;color:var(--gold2)}
+.cmi-lbl{font-size:9px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+
+/* Dish info panel */
+.dish-info-panel{display:flex;flex-direction:column;overflow:hidden;background:var(--bg2)}
+.dish-hero{padding:16px 18px 12px;border-bottom:1px solid var(--border);background:var(--bg3);flex-shrink:0;position:relative;overflow:hidden}
+.dish-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(200,146,42,0.1) 0%,transparent 70%)}
+.d-cuisine{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:6px}
+.d-name{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;color:var(--cream);line-height:1.1}
+.d-country-line{font-size:11px;color:var(--text2);margin-top:4px}
+.d-emoji{font-size:44px;margin-top:8px;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.4))}
+.dish-scroll{flex:1;overflow-y:auto;padding-bottom:8px}
+.dish-scroll::-webkit-scrollbar{width:3px}
+.dish-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.d-section{padding:12px 18px;border-bottom:1px solid var(--border)}
+.d-sec-label{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.dish-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.dish-tab{padding:4px 10px;font-size:10px;border-radius:2px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s}
+.dish-tab:hover{border-color:var(--border2);color:var(--text)}
+.dish-tab.active{background:var(--gold-dim);border-color:rgba(200,146,42,0.4);color:var(--gold2)}
+.nutri-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.nutri-card{background:var(--bg3);border:1px solid var(--border);border-radius:2px;padding:7px 9px}
+.nutri-val{font-size:15px;font-weight:600;color:var(--gold2)}
+.nutri-lbl{font-size:10px;color:var(--muted);margin-top:1px}
+.calorie-bar{margin-top:8px;background:var(--bg3);border:1px solid var(--border);border-radius:2px;overflow:hidden;height:5px}
+.calorie-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));transition:width .6s ease;border-radius:2px}
+.calorie-note{font-size:10px;color:var(--muted);margin-top:3px}
+.ing-list{display:flex;flex-direction:column;gap:4px}
+.ing-row{display:flex;align-items:center;gap:10px;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)}
+.ing-row:last-child{border:none}
+.ing-row::before{content:'';width:3px;height:3px;border-radius:50%;background:var(--gold);flex-shrink:0}
+.steps-list{display:flex;flex-direction:column;gap:8px}
+.step-row{display:flex;gap:10px;align-items:flex-start}
+.step-num{width:20px;height:20px;border-radius:2px;background:var(--bg4);border:1px solid var(--border2);font-size:10px;font-weight:600;color:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step-text{font-size:11px;color:var(--text2);line-height:1.6}
+.step-time{font-size:10px;color:var(--muted);margin-top:2px}
+.step-time::before{content:'⏱ '}
+.facts-card{background:var(--bg3);border:1px solid var(--border);border-radius:2px;padding:9px 11px;border-left:2px solid var(--gold)}
+.facts-card p{font-size:11px;color:var(--text2);line-height:1.6;font-style:italic}
+.dish-actions{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:7px;background:var(--bg2);flex-shrink:0}
+.btn-primary{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:2px;background:var(--gold);border:none;font-size:11px;font-weight:600;color:var(--bg);cursor:pointer;font-family:'Outfit',sans-serif;letter-spacing:.04em;transition:background .2s,transform .15s}
+.btn-primary:hover{background:var(--gold2);transform:translateY(-1px)}
+.btn-secondary{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;border-radius:2px;background:transparent;border:1px solid var(--border);font-size:11px;color:var(--text2);cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s}
+.btn-secondary:hover{border-color:var(--border2);color:var(--text);background:var(--bg3)}
+.btn-primary svg,.btn-secondary svg{width:12px;height:12px;stroke:currentColor;fill:none}
+
+/* DETAIL PANEL (right) — hidden, replaced by modal */
+.detail{display:none !important}
+.empty-state{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;opacity:.5}
+.empty-glyph{font-size:48px;filter:grayscale(1)}
+.empty-text{font-size:12px;color:var(--text2);text-align:center;line-height:1.6}
+.detail-hero{padding:20px 18px 16px;border-bottom:1px solid var(--border);background:var(--bg3);position:relative;overflow:hidden;flex-shrink:0}
+.detail-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(200,146,42,0.1) 0%,transparent 70%)}
+.detail-scroll{flex:1;overflow-y:auto;padding-bottom:8px}
+.detail-scroll::-webkit-scrollbar{width:3px}
+.detail-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.detail-actions{padding:12px 18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:7px;background:var(--bg2);flex-shrink:0}
+
+/* RECIPE MODAL — big centered overlay */
+#recipeModal{
+  position:fixed;left:0;top:0;right:0;bottom:0;z-index:9999;
+  display:none;align-items:center;justify-content:center;
+  background:rgba(8,6,4,0.85);backdrop-filter:blur(4px);
+  padding:24px;
+  width:100vw;height:100vh;
+}
+#recipeModal.open{display:flex;animation:modalFadeIn .25s ease}
+@keyframes modalFadeIn{from{opacity:0;transform:scale(0.97)}to{opacity:1;transform:scale(1)}}
+.rm-box{
+  background:var(--bg2);border:1px solid var(--border2);border-radius:6px;
+  width:100%;max-width:900px;max-height:90vh;
+  display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 24px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(200,146,42,0.12);
+}
+.rm-header{
+  display:flex;align-items:center;gap:14px;
+  padding:16px 22px;background:var(--bg3);border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.rm-flag{font-size:36px;line-height:1}
+.rm-title-block{flex:1;min-width:0}
+.rm-dish-name{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:700;color:var(--cream);line-height:1.1}
+.rm-cuisine{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:4px}
+.rm-country-line{font-size:13px;color:var(--text2);margin-top:3px}
+.rm-emoji{font-size:58px;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.5));flex-shrink:0}
+.rm-close{width:32px;height:32px;border-radius:3px;border:1px solid var(--border);background:var(--bg4);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:18px;
+  transition:all .15s;flex-shrink:0}
+.rm-close:hover{border-color:var(--border2);color:var(--gold);background:var(--bg3)}
+.rm-body{flex:1;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;min-height:0}
+.rm-body::-webkit-scrollbar{width:4px}
+.rm-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.rm-col{display:flex;flex-direction:column;overflow:hidden}
+.rm-col:first-child{border-right:1px solid var(--border)}
+.rm-section{padding:18px 22px;border-bottom:1px solid var(--border)}
+.rm-section:last-child{border-bottom:none}
+.rm-sec-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;font-weight:500}
+.rm-dish-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.rm-dish-tab{padding:6px 14px;font-size:12px;border-radius:2px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s}
+.rm-dish-tab:hover{border-color:var(--border2);color:var(--text)}
+.rm-dish-tab.active{background:var(--gold-dim);border-color:rgba(200,146,42,0.4);color:var(--gold2)}
+.rm-nutri-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.rm-nutri-card{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:10px 12px}
+.rm-nutri-val{font-size:18px;font-weight:600;color:var(--gold2)}
+.rm-nutri-lbl{font-size:10px;color:var(--muted);margin-top:2px}
+.rm-calorie-bar{margin-top:10px;background:var(--bg3);border:1px solid var(--border);border-radius:2px;overflow:hidden;height:6px}
+.rm-calorie-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));transition:width .6s ease}
+.rm-calorie-note{font-size:11px;color:var(--muted);margin-top:5px}
+.rm-ing-list{display:flex;flex-direction:column;gap:5px}
+.rm-ing-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)}
+.rm-ing-row:last-child{border:none}
+.rm-ing-row::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--gold);flex-shrink:0}
+.rm-steps-list{display:flex;flex-direction:column;gap:12px}
+.rm-step-row{display:flex;gap:12px;align-items:flex-start}
+.rm-step-num{width:26px;height:26px;border-radius:3px;background:var(--bg4);border:1px solid var(--border2);font-size:11px;font-weight:700;color:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.rm-step-body{}
+.rm-step-title{font-size:13px;font-weight:600;color:var(--cream);margin-bottom:2px}
+.rm-step-desc{font-size:12px;color:var(--text2);line-height:1.65}
+.rm-step-time{font-size:11px;color:var(--gold);margin-top:3px;opacity:.8}
+.rm-step-time::before{content:'⏱ '}
+.rm-fact-card{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:13px 16px;border-left:3px solid var(--gold)}
+.rm-fact-card p{font-size:13px;color:var(--text2);line-height:1.7;font-style:italic}
+.rm-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:10px;background:var(--bg3);flex-shrink:0}
+.rm-btn-primary{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:11px;border-radius:3px;background:var(--gold);border:none;font-size:13px;font-weight:600;color:var(--bg);cursor:pointer;font-family:'Outfit',sans-serif;letter-spacing:.04em;transition:background .2s,transform .15s}
+.rm-btn-primary:hover{background:var(--gold2);transform:translateY(-1px)}
+.rm-btn-secondary{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;border-radius:3px;background:transparent;border:1px solid var(--border);font-size:13px;color:var(--text2);cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s}
+.rm-btn-secondary:hover{border-color:var(--border2);color:var(--text);background:var(--bg4)}
+.rm-btn-primary svg,.rm-btn-secondary svg{width:14px;height:14px;stroke:currentColor;fill:none}
+/* map area should now use full width since detail panel is hidden */
+
+
+/* STATUS BAR */
+.statusbar{height:24px;background:var(--bg2);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:16px;flex-shrink:0}
+.sb-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);letter-spacing:.04em}
+.sb-item svg{width:10px;height:10px;stroke:currentColor}
+.sb-dot{width:5px;height:5px;border-radius:50%;background:var(--green)}
+
+/* FADE IN */
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.fade-in{animation:fadeIn .35s ease forwards}
+
+/* VIEW TRANSITION */
+.view-slide-in{animation:slideIn .3s ease forwards}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+
+/* Tooltip */
+#mapTooltip{
+  position:fixed;background:rgba(14,11,8,0.95);border:1px solid var(--border2);
+  border-radius:3px;padding:6px 12px;font-size:12px;color:var(--text);
+  pointer-events:none;display:none;z-index:100;
+  box-shadow:0 4px 20px rgba(0,0,0,0.5);
+  transition:opacity .1s;
+}
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+  <div class="win-title"><span>Globe</span><span style="color:var(--cream)">Bite</span> — World Cuisine Explorer</div>
+  <div style="width:52px"></div>
+</div>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-ring"></div><div class="splash-ring"></div><div class="splash-ring"></div>
+  <canvas id="splashGlobeCanvas" width="260" height="260"></canvas>
+  <div class="splash-text">
+    <div class="splash-logo">Globe<em>Bite</em></div>
+    <div class="splash-tagline">Taste the World · One Country at a Time</div>
+  </div>
+  <button class="splash-enter" onclick="enterApp()">Explore &rarr;</button>
+  <div class="splash-meta">KU · ENGG 102 · Year I / Semester II &nbsp;·&nbsp; 2026</div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="app-body">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sb-brand">
+        <div class="sb-logo">Globe<em>Bite</em></div>
+        <div class="sb-badge">World v2.0</div>
+      </div>
+      <div class="sb-search">
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="searchIn" placeholder="Search dishes or countries…" oninput="doSearch()"/>
+        </div>
+      </div>
+      <div class="sb-section-label">Countries</div>
+      <div class="country-list" id="countryList"></div>
+      <div class="sb-footer">
+        <button class="sb-btn" onclick="showFavourites()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          Favourites (<span id="favCount">0</span>)
+        </button>
+      </div>
+    </div>
+
+    <!-- MAP AREA -->
+    <div class="map-area">
+      <div class="toolbar">
+        <button class="tb-btn active-view" id="btnGlobe" onclick="switchView('globe')">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          3D Globe
+        </button>
+        <button class="tb-btn" id="btnMap" onclick="switchView('map')">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+          World Map
+        </button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" onclick="zoomIn()"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>Zoom In</button>
+        <button class="tb-btn" onclick="zoomOut()"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>Zoom Out</button>
+        <button class="tb-btn" onclick="resetView()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.2"/></svg>Reset
+        </button>
+        <div class="tb-right">
+          <button class="tb-btn accent" onclick="toggleAutoRotate()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+            <span id="rotateLabel">Auto-rotate</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- GLOBE VIEW -->
+      <div id="globeView">
+        <canvas id="globeCanvas"></canvas>
+        <div class="map-hint" id="mapHint">🌍 Drag to rotate · Scroll to zoom · Click a glowing dot to explore</div>
+        <div class="country-tooltip" id="countryTooltip"></div>
+        <div class="globe-controls">
+          <div class="globe-ctrl-btn" onclick="zoomIn()" title="Zoom in">+</div>
+          <div class="globe-ctrl-btn" onclick="zoomOut()" title="Zoom out">−</div>
+        </div>
+      </div>
+
+      <!-- FLAT MAP VIEW -->
+      <div id="flatMapView">
+        <div class="flat-map-wrap">
+          <svg id="worldMapSvg" viewBox="0 0 960 500"></svg>
+          <!-- Country detail overlay (appears when country clicked on map) -->
+          <div id="countryDetailOverlay">
+            <div class="overlay-header">
+              <button class="back-btn" onclick="closeCountryOverlay()">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                Back to Map
+              </button>
+              <span class="overlay-flag" id="overlayFlag"></span>
+              <span class="overlay-country-name" id="overlayCountryName"></span>
+            </div>
+            <div class="overlay-body">
+              <!-- Country shape map -->
+              <div class="country-map-panel">
+                <div class="country-map-bg"></div>
+                <div class="country-map-info" id="countryMapInfo"></div>
+                <svg id="countryMapSvg" width="380" height="280"></svg>
+                <div class="country-map-label" id="countryMapLabel"></div>
+              </div>
+              <!-- Dish info -->
+              <div class="dish-info-panel">
+                <div class="dish-hero">
+                  <div class="d-cuisine" id="odCuisine"></div>
+                  <div class="d-name" id="odName"></div>
+                  <div class="d-country-line" id="odCountry"></div>
+                  <div class="d-emoji" id="odEmoji"></div>
+                </div>
+                <div class="dish-scroll">
+                  <div class="d-section" id="odDishSelectorSection" style="display:none">
+                    <div class="d-sec-label">Dishes</div>
+                    <div class="dish-tabs" id="odDishTabs"></div>
+                  </div>
+                  <div class="d-section">
+                    <div class="d-sec-label">Nutrition per serving</div>
+                    <div class="nutri-grid" id="odNutri"></div>
+                    <div class="calorie-bar"><div class="calorie-fill" id="odCalorieFill"></div></div>
+                    <div class="calorie-note" id="odCalorieNote"></div>
+                  </div>
+                  <div class="d-section">
+                    <div class="d-sec-label">Key ingredients</div>
+                    <div class="ing-list" id="odIng"></div>
+                  </div>
+                  <div class="d-section">
+                    <div class="d-sec-label">How to cook · Step by step</div>
+                    <div class="steps-list" id="odSteps"></div>
+                  </div>
+                  <div class="d-section">
+                    <div class="d-sec-label">Fun fact</div>
+                    <div class="facts-card"><p id="odFact"></p></div>
+                  </div>
+                </div>
+                <div class="dish-actions">
+                  <button class="btn-primary" id="odFavBtn" onclick="toggleFavOverlay()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                    Save
+                  </button>
+                  <button class="btn-secondary" onclick="exportRecipeOverlay()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Export
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT DETAIL PANEL -->
+    <div class="detail">
+      <div id="emptyState" class="empty-state">
+        <div class="empty-glyph">🌏</div>
+        <div class="empty-text">Click a glowing country<br>on the globe or map<br>to explore its cuisine</div>
+      </div>
+      <div id="detailContent" style="display:none;flex-direction:column;height:100%">
+        <div class="detail-hero">
+          <div class="d-cuisine" id="dCuisine"></div>
+          <div class="d-name" id="dName"></div>
+          <div class="d-country-line" id="dCountry"></div>
+          <div class="d-emoji" id="dEmoji"></div>
+        </div>
+        <div class="detail-scroll">
+          <div class="d-section" id="dishSelectorSection" style="display:none">
+            <div class="d-sec-label">Dishes</div>
+            <div class="dish-tabs" id="dishTabs"></div>
+          </div>
+          <div class="d-section">
+            <div class="d-sec-label">Nutrition per serving</div>
+            <div class="nutri-grid" id="dNutri"></div>
+            <div class="calorie-bar"><div class="calorie-fill" id="calorieFill"></div></div>
+            <div class="calorie-note" id="calorieNote"></div>
+          </div>
+          <div class="d-section">
+            <div class="d-sec-label">Key ingredients</div>
+            <div class="ing-list" id="dIng"></div>
+          </div>
+          <div class="d-section">
+            <div class="d-sec-label">How to cook · Step by step</div>
+            <div class="steps-list" id="dSteps"></div>
+          </div>
+          <div class="d-section">
+            <div class="d-sec-label">Fun fact</div>
+            <div class="facts-card"><p id="dFact"></p></div>
+          </div>
+        </div>
+        <div class="detail-actions">
+          <button class="btn-primary" id="favBtn" onclick="toggleFav()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            Save to favourites
+          </button>
+          <button class="btn-secondary" onclick="exportRecipe()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export recipe as .txt
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div class="statusbar">
+    <div class="sb-item"><div class="sb-dot"></div><span id="statusCount">10 countries loaded</span></div>
+    <div class="sb-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      <span id="viewLabel">3D Globe + Interactive Map</span>
+    </div>
+    <div class="sb-item" style="margin-left:auto">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      GlobeBite v2.1
+    </div>
+  </div>
+</div>
+
+<div id="mapTooltip"></div>
+
+<!-- RECIPE MODAL -->
+<div id="recipeModal" onclick="handleModalBgClick(event)">
+  <div class="rm-box" id="rmBox">
+    <div class="rm-header">
+      <div id="rmFlag" class="rm-flag"></div>
+      <div class="rm-title-block">
+        <div class="rm-cuisine" id="rmCuisine"></div>
+        <div class="rm-dish-name" id="rmDishName"></div>
+        <div class="rm-country-line" id="rmCountryLine"></div>
+      </div>
+      <div id="rmEmoji" class="rm-emoji"></div>
+      <div class="rm-close" onclick="closeRecipeModal()" title="Close">✕</div>
+    </div>
+    <div id="rmDishSelectorSection" style="display:none;padding:10px 22px 0;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0">
+      <div class="rm-dish-tabs" id="rmDishTabs"></div>
+    </div>
+    <div class="rm-body">
+      <div class="rm-col" style="overflow-y:auto">
+        <div class="rm-section">
+          <div class="rm-sec-label">Nutrition per serving</div>
+          <div class="rm-nutri-grid" id="rmNutri"></div>
+          <div class="rm-calorie-bar"><div class="rm-calorie-fill" id="rmCalorieFill"></div></div>
+          <div class="rm-calorie-note" id="rmCalorieNote"></div>
+        </div>
+        <div class="rm-section">
+          <div class="rm-sec-label">Key ingredients</div>
+          <div class="rm-ing-list" id="rmIng"></div>
+        </div>
+        <div class="rm-section">
+          <div class="rm-sec-label">Fun fact</div>
+          <div class="rm-fact-card"><p id="rmFact"></p></div>
+        </div>
+      </div>
+      <div class="rm-col" style="overflow-y:auto">
+        <div class="rm-section">
+          <div class="rm-sec-label">How to cook · Step by step</div>
+          <div class="rm-steps-list" id="rmSteps"></div>
+        </div>
+      </div>
+    </div>
+    <div class="rm-footer">
+      <button class="rm-btn-primary" id="rmFavBtn" onclick="toggleFavModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Save to favourites
+      </button>
+      <button class="rm-btn-secondary" onclick="exportRecipeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export recipe as .txt
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const countries = {
+  Nepal:{
+    flag:'🇳🇵', lat:28, lon:84, iso:'NPL', capital:'Kathmandu', population:'30M', area:'147k km²',
+    dishes:[
+      { name:'Momos', cuisine:'Nepali street food', emoji:'🥟',
+        nutri:[{v:'280',l:'Calories'},{v:'14g',l:'Protein'},{v:'32g',l:'Carbs'},{v:'8g',l:'Fat'}],
+        ing:['All-purpose flour','Buffalo minced meat','Garlic','Ginger','Spring onion','Coriander','Sesame oil','Turmeric','Salt','Green chilli'],
+        steps:[
+          {t:'Prepare dough',d:'Knead 2 cups flour with ½ cup water until smooth and elastic. Cover and rest for 20 min.',time:'20 min'},
+          {t:'Make filling',d:'Mix 300g minced meat with minced garlic, ginger, spring onion, coriander, sesame oil, turmeric, salt and green chilli.',time:'5 min'},
+          {t:'Shape momos',d:'Roll dough into thin circles (~8 cm). Place 1 tbsp filling in centre. Pinch and fold into pleats, sealing at top.',time:'20 min'},
+          {t:'Steam',d:'Arrange momos on a lightly oiled steamer rack. Steam over boiling water for 12–15 minutes until translucent.',time:'15 min'},
+          {t:'Serve',d:'Serve hot with achar — blend roasted tomatoes, garlic, dried chilli, sesame seeds and salt into a smooth chutney.',time:'5 min'},
+        ],
+        fact:'Momos originated in Tibet and became a staple in Nepal and the Darjeeling region. Every household has a slightly different fold technique, passed down through generations.',
+      },
+      { name:'Dal Bhat', cuisine:'Nepali home cooking', emoji:'🍚',
+        nutri:[{v:'420',l:'Calories'},{v:'18g',l:'Protein'},{v:'70g',l:'Carbs'},{v:'6g',l:'Fat'}],
+        ing:['Lentils (masoor/toor)','Steamed white rice','Spinach or mustard greens','Cumin seeds','Turmeric','Garlic','Ginger','Ghee','Tomato','Fenugreek seeds'],
+        steps:[
+          {t:'Cook lentils',d:'Boil 1 cup lentils in 3 cups water with turmeric and salt until completely soft, ~25 min. Mash slightly.',time:'25 min'},
+          {t:'Temper (tarkari)',d:'Heat 2 tbsp ghee. Add fenugreek seeds and cumin — let sizzle. Add minced garlic and ginger, cook 2 min.',time:'5 min'},
+          {t:'Add tomato',d:'Add chopped tomato and cook until oil separates. Pour tarka over lentils and stir.',time:'8 min'},
+          {t:'Cook greens',d:'Sauté spinach or mustard greens with garlic, cumin and salt until wilted.',time:'5 min'},
+          {t:'Plate & serve',d:'Serve lentil soup and greens alongside a generous mound of steamed rice. Eat with your right hand!',time:'2 min'},
+        ],
+        fact:'Dal Bhat (lentils and rice) is eaten twice daily by most Nepalis. Trekkers call it "Dal Bhat power, 24-hour!"',
+      },
+    ]
+  },
+  Japan:{
+    flag:'🇯🇵', lat:36, lon:138, iso:'JPN', capital:'Tokyo', population:'125M', area:'378k km²',
+    dishes:[
+      { name:'Ramen', cuisine:'Japanese comfort food', emoji:'🍜',
+        nutri:[{v:'450',l:'Calories'},{v:'22g',l:'Protein'},{v:'58g',l:'Carbs'},{v:'14g',l:'Fat'}],
+        ing:['Wheat ramen noodles','Pork bone broth','Chashu pork belly','Soy tare','Soft-boiled marinated egg','Nori','Bamboo shoots','Green onion','Sesame seeds','Ginger'],
+        steps:[
+          {t:'Make tonkotsu broth',d:'Blanch pork bones, then simmer in fresh water at a rolling boil for 8–12 hours until broth turns white and creamy.',time:'720 min'},
+          {t:'Prepare tare',d:'Mix 3 tbsp soy sauce, 1 tbsp mirin, 1 tbsp sake, 1 tsp sugar. Bring to a gentle simmer and cool.',time:'5 min'},
+          {t:'Chashu pork',d:'Roll pork belly tightly, tie with twine. Sear all sides. Braise in soy, mirin, sake, sugar, water for 2 hours. Slice thin.',time:'120 min'},
+          {t:'Marinated egg',d:'Soft-boil eggs 6.5 min, peel, soak overnight in soy, mirin, water mixture.',time:'480 min'},
+          {t:'Cook noodles & assemble',d:'Cook noodles per packet. Add 2 tbsp tare to bowl, ladle hot broth, noodles, then toppings.',time:'5 min'},
+        ],
+        fact:'Ramen was introduced from China but Japan transformed it into a cultural icon. Each region has a distinct style. There are over 35,000 ramen shops in Japan.',
+      },
+      { name:'Sushi', cuisine:'Japanese fine dining', emoji:'🍣',
+        nutri:[{v:'350',l:'Calories'},{v:'20g',l:'Protein'},{v:'48g',l:'Carbs'},{v:'8g',l:'Fat'}],
+        ing:['Sushi-grade salmon or tuna','Japanese short-grain rice','Rice vinegar','Sugar','Salt','Nori sheets','Wasabi','Pickled ginger','Soy sauce'],
+        steps:[
+          {t:'Cook sushi rice',d:'Rinse 2 cups rice until clear. Cook with 2.2 cups water. Mix 3 tbsp rice vinegar, 2 tbsp sugar, 1 tsp salt. Fold into warm rice.',time:'35 min'},
+          {t:'Slice fish',d:'Using a very sharp knife, slice fish at a slight angle into 5mm strips. Keep chilled.',time:'10 min'},
+          {t:'Form nigiri',d:'Wet hands, take a small ball (~20g) of rice, press into oblong shape. Place fish slice on top.',time:'10 min'},
+          {t:'Roll maki',d:'Place nori on bamboo mat. Spread thin rice layer, add filling, roll tightly. Slice into 6–8 pieces.',time:'15 min'},
+          {t:'Serve',d:'Arrange on platter. Serve with wasabi, soy sauce, and pickled ginger. Eat within 30 minutes.',time:'2 min'},
+        ],
+        fact:'The word "sushi" refers to the vinegared rice, not the fish. Modern nigiri was invented in Edo-period Tokyo as fast food for fish market workers.',
+      },
+    ]
+  },
+  India:{
+    flag:'🇮🇳', lat:21, lon:79, iso:'IND', capital:'New Delhi', population:'1.4B', area:'3.29M km²',
+    dishes:[
+      { name:'Butter Chicken', cuisine:'Mughlai North Indian', emoji:'🍛',
+        nutri:[{v:'520',l:'Calories'},{v:'35g',l:'Protein'},{v:'18g',l:'Carbs'},{v:'32g',l:'Fat'}],
+        ing:['Chicken thighs','Tomato purée','Unsalted butter','Heavy cream','Garam masala','Kashmiri red chilli','Ginger-garlic paste','Kasuri methi','Cardamom pods','Yoghurt'],
+        steps:[
+          {t:'Marinate chicken',d:'Mix chicken with yoghurt, ginger-garlic paste, Kashmiri chilli, garam masala, salt. Marinate 4–8 hours.',time:'480 min'},
+          {t:'Grill or sear',d:'Cook on high heat until charred at edges and cooked through. Set aside.',time:'12 min'},
+          {t:'Make the sauce',d:'Sauté butter, cardamom, cloves. Add onion until golden. Add ginger-garlic paste, cook 2 min. Add tomatoes.',time:'20 min'},
+          {t:'Blend & cream',d:'Blend sauce until silky smooth. Return to pan, add 100ml cream and 2 tbsp butter. Simmer 8 min.',time:'10 min'},
+          {t:'Finish & serve',d:'Add chicken to sauce, simmer 10 min. Crush kasuri methi between palms and stir in.',time:'12 min'},
+        ],
+        fact:'Butter Chicken was invented at Moti Mahal restaurant in Delhi in the 1950s — by accident. Leftover tandoori chicken was simmered in a tomato-butter gravy.',
+      },
+      { name:'Biryani', cuisine:'Hyderabadi / Mughal', emoji:'🫕',
+        nutri:[{v:'650',l:'Calories'},{v:'30g',l:'Protein'},{v:'85g',l:'Carbs'},{v:'20g',l:'Fat'}],
+        ing:['Basmati rice','Bone-in chicken','Onions','Yoghurt','Saffron','Whole spices','Fresh mint','Coriander','Rose water','Ghee'],
+        steps:[
+          {t:'Marinate chicken',d:'Coat chicken in yoghurt, fried onions, ginger-garlic paste, red chilli, garam masala, salt. Rest 1 hour.',time:'60 min'},
+          {t:'Par-cook rice',d:'Soak basmati 30 min. Boil with whole spices and salt until 70% cooked. Drain.',time:'20 min'},
+          {t:'Layer',d:'In a heavy pot, layer chicken → par-cooked rice → fried onions → mint → coriander. Top with saffron milk and ghee.',time:'10 min'},
+          {t:'Dum cooking',d:'Seal pot with dough or foil. Cook on high 5 min, then very low heat for 35–40 min.',time:'50 min'},
+          {t:'Serve',d:'Gently mix layers while scooping. Serve with raita and sliced onion.',time:'5 min'},
+        ],
+        fact:'Biryani was brought to the Indian subcontinent by Mughal emperors in the 16th century. Today there are over 26 regional varieties.',
+      },
+    ]
+  },
+  China:{
+    flag:'🇨🇳', lat:35, lon:103, iso:'CHN', capital:'Beijing', population:'1.4B', area:'9.6M km²',
+    dishes:[
+      { name:'Kung Pao Chicken', cuisine:'Sichuan Chinese', emoji:'🥢',
+        nutri:[{v:'380',l:'Calories'},{v:'28g',l:'Protein'},{v:'22g',l:'Carbs'},{v:'18g',l:'Fat'}],
+        ing:['Chicken breast','Roasted peanuts','Dried red chillies','Sichuan peppercorns','Garlic & ginger','Dark soy sauce','Rice vinegar','Cornstarch','Shaoxing wine','Sugar'],
+        steps:[
+          {t:'Marinate chicken',d:'Cut chicken into 1.5cm cubes. Marinate with soy, Shaoxing wine, cornstarch, sesame oil. Rest 15 min.',time:'15 min'},
+          {t:'Mix sauce',d:'Combine soy sauce, rice vinegar, sugar, cornstarch and water in a small bowl.',time:'2 min'},
+          {t:'Fry aromatics',d:'Heat wok until smoking. Add oil, dried chillies and Sichuan peppercorns. Fry 20 seconds.',time:'2 min'},
+          {t:'Stir-fry chicken',d:'Add garlic and ginger, then chicken. Stir-fry on max heat 3–4 min.',time:'4 min'},
+          {t:'Finish',d:'Pour sauce into wok, toss 30 seconds. Add peanuts. Serve immediately over steamed rice.',time:'2 min'},
+        ],
+        fact:'Named after Ding Baozhen, a Qing dynasty official. The dish was nearly banned during the Cultural Revolution as "feudal" but returned triumphantly after 1980.',
+      },
+      { name:'Dim Sum', cuisine:'Cantonese tradition', emoji:'🫔',
+        nutri:[{v:'310',l:'Calories'},{v:'16g',l:'Protein'},{v:'28g',l:'Carbs'},{v:'14g',l:'Fat'}],
+        ing:['Wheat starch','Tapioca flour','Shrimp','Pork','Bamboo shoots','Sesame oil','Oyster sauce','Ginger','Spring onion','Rice noodle sheets'],
+        steps:[
+          {t:'Make har gow dough',d:'Mix wheat starch + tapioca flour. Pour in boiling water, stir quickly. Knead until smooth.',time:'10 min'},
+          {t:'Prepare filling',d:'Mix minced shrimp, diced bamboo shoots, sesame oil, oyster sauce, ginger, spring onion.',time:'5 min'},
+          {t:'Shape dumplings',d:'Roll small dough pieces thin. Place filling in centre. Fold and pleat 7 times to seal.',time:'20 min'},
+          {t:'Steam',d:'Line steamer with parchment. Steam at high heat 6–8 min until translucent.',time:'8 min'},
+          {t:'Serve yum cha style',d:'Serve hot in bamboo steamer baskets alongside other dim sum. Pair with jasmine tea.',time:'2 min'},
+        ],
+        fact:'Dim Sum originated as small snacks served at teahouses along the ancient Silk Road. Yum cha dates to the Tang dynasty.',
+      },
+    ]
+  },
+  'South Korea':{
+    flag:'🇰🇷', lat:37, lon:128, iso:'KOR', capital:'Seoul', population:'52M', area:'100k km²',
+    dishes:[
+      { name:'Bibimbap', cuisine:'Korean traditional', emoji:'🍚',
+        nutri:[{v:'490',l:'Calories'},{v:'18g',l:'Protein'},{v:'75g',l:'Carbs'},{v:'12g',l:'Fat'}],
+        ing:['Short-grain rice','Spinach namul','Bean sprout namul','Julienned carrots','Shiitake mushrooms','Bulgogi beef','Fried egg','Gochujang paste','Sesame oil'],
+        steps:[
+          {t:'Prepare namuls',d:'Blanch spinach, season with garlic, sesame oil, soy, sesame seeds. Blanch bean sprouts similarly. Sauté carrots and mushrooms separately.',time:'20 min'},
+          {t:'Cook beef',d:'Marinate sliced beef in soy sauce, sesame oil, garlic, sugar, pear juice. Stir-fry on high heat 3–4 min.',time:'15 min'},
+          {t:'Cook egg',d:'Fry egg sunny side up (yolk runny) in sesame oil.',time:'3 min'},
+          {t:'Assemble',d:'Place warm rice in bowl. Arrange namuls and beef in sections around bowl. Add egg in centre.',time:'3 min'},
+          {t:'Serve',d:'Drizzle sesame oil, add gochujang. Mix everything vigorously before eating.',time:'1 min'},
+        ],
+        fact:'Bibimbap literally means "mixed rice." It was historically eaten on the last day of the year to clear out all remaining side dishes.',
+      },
+      { name:'Tteokbokki', cuisine:'Korean street food', emoji:'🌶️',
+        nutri:[{v:'360',l:'Calories'},{v:'8g',l:'Protein'},{v:'68g',l:'Carbs'},{v:'6g',l:'Fat'}],
+        ing:['Garae-tteok (rice cakes)','Gochujang paste','Gochugaru','Fish cakes','Soy sauce','Sugar','Anchovy broth','Green onion','Sesame seeds'],
+        steps:[
+          {t:'Make anchovy broth',d:'Boil 4 dried anchovies and dried kelp in 500ml water for 10 min. Remove and season.',time:'12 min'},
+          {t:'Mix sauce',d:'Combine gochujang, gochugaru, soy sauce, sugar, minced garlic.',time:'3 min'},
+          {t:'Cook tteok',d:'Soak refrigerated rice cakes in cold water 10 min. Add to broth with sauce. Simmer.',time:'5 min'},
+          {t:'Add fish cakes',d:'Cut fish cakes into strips, add to pot. Simmer 8–10 min until sauce thickens.',time:'10 min'},
+          {t:'Serve',d:'Top with sliced green onion, sesame seeds, and a soft-boiled egg.',time:'2 min'},
+        ],
+        fact:'Tteokbokki was originally a royal court dish. The spicy version only emerged in the 1950s after the Korean War.',
+      },
+    ]
+  },
+  Thailand:{
+    flag:'🇹🇭', lat:15, lon:101, iso:'THA', capital:'Bangkok', population:'72M', area:'513k km²',
+    dishes:[
+      { name:'Tom Yum Goong', cuisine:'Thai aromatic soup', emoji:'🍲',
+        nutri:[{v:'210',l:'Calories'},{v:'24g',l:'Protein'},{v:'10g',l:'Carbs'},{v:'6g',l:'Fat'}],
+        ing:['Tiger prawns','Lemongrass','Galangal','Kaffir lime leaves','Bird\'s eye chillies','Fish sauce','Lime juice','Oyster mushrooms','Coriander','Tom yum paste'],
+        steps:[
+          {t:'Build aromatic broth',d:'Bruise lemongrass, galangal and kaffir lime leaves. Simmer in 600ml water for 10 min.',time:'12 min'},
+          {t:'Add mushrooms',d:'Add halved mushrooms and 2 tbsp tom yum paste. Cook 3 min.',time:'3 min'},
+          {t:'Add prawns',d:'Add shelled tiger prawns. Cook just 2–3 min until pink.',time:'3 min'},
+          {t:'Season',d:'Remove from heat. Season with fish sauce and lime juice.',time:'2 min'},
+          {t:'Finish & serve',d:'Ladle into bowls, garnish with fresh chillies and coriander.',time:'2 min'},
+        ],
+        fact:'Tom Yum is so central to Thai identity that the government nominated it for UNESCO Intangible Cultural Heritage status.',
+      },
+      { name:'Pad Thai', cuisine:'Thai stir-fry classic', emoji:'🍝',
+        nutri:[{v:'440',l:'Calories'},{v:'20g',l:'Protein'},{v:'58g',l:'Carbs'},{v:'15g',l:'Fat'}],
+        ing:['Rice noodles (sen lek)','Shrimp or tofu','Eggs','Bean sprouts','Spring onion','Roasted peanuts','Tamarind paste','Fish sauce','Palm sugar','Dried shrimp'],
+        steps:[
+          {t:'Soak noodles',d:'Soak rice noodles in room-temperature water for 30 min until pliable but not fully soft.',time:'30 min'},
+          {t:'Make sauce',d:'Mix tamarind paste, fish sauce, palm sugar until sugar dissolves.',time:'3 min'},
+          {t:'Cook protein',d:'Heat wok until smoking. Add oil and shrimp or tofu. Cook until done.',time:'3 min'},
+          {t:'Scramble egg',d:'Add oil to wok, crack in 2 eggs, scramble briefly, then combine with protein.',time:'2 min'},
+          {t:'Finish',d:'Add drained noodles and sauce. Toss on high heat. Serve with peanuts, lime wedge, chilli flakes.',time:'5 min'},
+        ],
+        fact:'Pad Thai was invented in the 1930s as a nationalist campaign to create a unified Thai national dish and reduce rice consumption.',
+      },
+    ]
+  },
+  Italy:{
+    flag:'🇮🇹', lat:42, lon:12, iso:'ITA', capital:'Rome', population:'60M', area:'301k km²',
+    dishes:[
+      { name:'Carbonara', cuisine:'Roman pasta', emoji:'🍝',
+        nutri:[{v:'580',l:'Calories'},{v:'26g',l:'Protein'},{v:'62g',l:'Carbs'},{v:'24g',l:'Fat'}],
+        ing:['Spaghetti or rigatoni','Guanciale (cured pork cheek)','Pecorino Romano','Parmigiano-Reggiano','Egg yolks','Whole egg','Black pepper','Salt'],
+        steps:[
+          {t:'Cook pasta',d:'Boil pasta in well-salted water until 1 min before al dente. Reserve 200ml pasta water.',time:'10 min'},
+          {t:'Crisp guanciale',d:'Cook diced guanciale in a cold pan over medium heat until fat renders and edges crisp.',time:'8 min'},
+          {t:'Make egg mixture',d:'Whisk 4 yolks + 1 whole egg with 60g Pecorino, 40g Parmigiano, lots of black pepper.',time:'3 min'},
+          {t:'Combine',d:'Drain pasta, add to guanciale pan (off heat). Add egg mixture and pasta water. Toss vigorously.',time:'3 min'},
+          {t:'Serve immediately',d:'Plate, add more grated cheese and cracked pepper.',time:'1 min'},
+        ],
+        fact:'True carbonara contains no cream, onion, or garlic. Romans will argue heatedly about this.',
+      },
+    ]
+  },
+  Mexico:{
+    flag:'🇲🇽', lat:23, lon:-102, iso:'MEX', capital:'Mexico City', population:'130M', area:'1.96M km²',
+    dishes:[
+      { name:'Tacos al Pastor', cuisine:'Mexican street food', emoji:'🌮',
+        nutri:[{v:'350',l:'Calories'},{v:'22g',l:'Protein'},{v:'35g',l:'Carbs'},{v:'12g',l:'Fat'}],
+        ing:['Pork shoulder','Dried chillies (guajillo, ancho)','Achiote paste','Pineapple','Corn tortillas','White onion','Coriander','Lime','Salsa verde'],
+        steps:[
+          {t:'Make marinade',d:'Toast and soak dried chillies. Blend with achiote paste, garlic, cumin, oregano, pineapple juice.',time:'20 min'},
+          {t:'Marinate pork',d:'Slice pork thin, coat in marinade, layer with pineapple slices. Refrigerate 4–12 hours.',time:'480 min'},
+          {t:'Cook',d:'Cook on a vertical spit or in batches on a screaming-hot cast iron pan until edges caramelise.',time:'15 min'},
+          {t:'Warm tortillas',d:'Heat corn tortillas directly on gas flame or dry comal until puffed with char spots.',time:'5 min'},
+          {t:'Assemble',d:'Double stack tortillas, add pork, diced pineapple, white onion, coriander. Squeeze lime.',time:'3 min'},
+        ],
+        fact:'Tacos al Pastor were created in the 1930s by Lebanese immigrants to Mexico who adapted their shawarma tradition.',
+      },
+    ]
+  },
+  France:{
+    flag:'🇫🇷', lat:46, lon:2, iso:'FRA', capital:'Paris', population:'68M', area:'552k km²',
+    dishes:[
+      { name:'Coq au Vin', cuisine:'French country classic', emoji:'🍷',
+        nutri:[{v:'490',l:'Calories'},{v:'38g',l:'Protein'},{v:'14g',l:'Carbs'},{v:'26g',l:'Fat'}],
+        ing:['Whole chicken portions','Red Burgundy wine','Bacon lardons','Pearl onions','Button mushrooms','Garlic','Thyme','Bay leaf','Chicken stock','Tomato paste'],
+        steps:[
+          {t:'Brown chicken',d:'Season chicken, dredge lightly in flour. Sear in butter and oil until deeply golden.',time:'15 min'},
+          {t:'Cook lardons',d:'In same pot, render lardons until golden. Add pearl onions and garlic, cook 3 min.',time:'8 min'},
+          {t:'Deglaze',d:'Add the whole bottle of red wine and chicken stock. Stir in tomato paste, thyme and bay leaf.',time:'3 min'},
+          {t:'Braise',d:'Return chicken to pot. Bring to simmer, cover, cook on low for 45 min.',time:'50 min'},
+          {t:'Finish',d:'Sauté mushrooms in butter until golden. Add to pot last 10 min.',time:'15 min'},
+        ],
+        fact:'Coq au Vin literally means "rooster in wine." Julia Child introduced the dish to America in 1961.',
+      },
+    ]
+  },
+  'United States':{
+    flag:'🇺🇸', lat:38, lon:-97, iso:'USA', capital:'Washington DC', population:'335M', area:'9.83M km²',
+    dishes:[
+      { name:'BBQ Brisket', cuisine:'Texas barbecue', emoji:'🥩',
+        nutri:[{v:'620',l:'Calories'},{v:'45g',l:'Protein'},{v:'4g',l:'Carbs'},{v:'46g',l:'Fat'}],
+        ing:['Beef brisket (whole packer)','Coarse kosher salt','Coarse black pepper','Oak or hickory wood'],
+        steps:[
+          {t:'Trim & season',d:'Trim fat cap to 6mm. Mix equal parts coarse salt and black pepper. Rub generously. Rest overnight.',time:'720 min'},
+          {t:'Start smoker',d:'Bring smoker to 107°C (225°F) using oak splits.',time:'45 min'},
+          {t:'Smoke',d:'Place brisket fat-side up. Smoke 6–8 hours until internal temperature reaches 71°C.',time:'480 min'},
+          {t:'Wrap & continue',d:'Wrap tightly in butcher paper. Return to smoker until probe-tender (~93–96°C). 3–5 more hours.',time:'240 min'},
+          {t:'Rest & slice',d:'Rest wrapped brisket at least 1 hour. Slice across the grain.',time:'60 min'},
+        ],
+        fact:'Texas brisket evolved from Jewish and Czech immigrant cattle ranchers in Central Texas in the late 1800s.',
+      },
+    ]
+  },
+};
+
+// ISO to country name mapping for world map
+const isoToCountry = {};
+Object.entries(countries).forEach(([name, data]) => { isoToCountry[data.iso] = name; });
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let scene, camera, renderer, isDragging=false, prevMouse={x:0,y:0};
+let rotateVelocity={x:0,y:0}, autoRotate=true, cameraDistance=2.5;
+let countryMarkers=[], raycaster, mouse3d, currentCountry=null;
+const favourites=new Set();
+let activeDishIndex=0;
+let currentView='globe'; // 'globe' or 'map'
+let worldGeoData=null;
+let mapZoom=null, mapSvg=null, mapProjection=null;
+
+// ─── UTILITY ─────────────────────────────────────────────────────────────────
+function latLonTo3D(lat, lon, r=1.02) {
+  const phi = (90-lat)*Math.PI/180;
+  const theta = (lon+180)*Math.PI/180;
+  return new THREE.Vector3(
+    -r*Math.sin(phi)*Math.cos(theta),
+    r*Math.cos(phi),
+    r*Math.sin(phi)*Math.sin(theta)
+  );
+}
+
+// ─── SPLASH GLOBE ────────────────────────────────────────────────────────────
+function initSplashGlobe() {
+  const canvas = document.getElementById('splashGlobeCanvas');
+  const s=new THREE.Scene(), cam2=new THREE.PerspectiveCamera(45,1,0.1,100);
+  cam2.position.z=2.5;
+  const r2=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  r2.setSize(260,260); r2.setClearColor(0,0);
+  s.add(new THREE.AmbientLight(0xffffff,0.4));
+  const sl=new THREE.DirectionalLight(0xffe4b5,1.2); sl.position.set(3,2,3); s.add(sl);
+  const og=new THREE.SphereGeometry(1,48,48);
+  const om=new THREE.MeshPhongMaterial({color:0x071628,shininess:50,specular:new THREE.Color(0x1a3a5c)});
+  s.add(new THREE.Mesh(og,om));
+  const ag=new THREE.SphereGeometry(1.04,48,48);
+  const am=new THREE.MeshPhongMaterial({color:0x1a4a6a,transparent:true,opacity:0.15,side:THREE.BackSide});
+  s.add(new THREE.Mesh(ag,am));
+  const gm2=new THREE.LineBasicMaterial({color:0xC8922A,transparent:true,opacity:0.08});
+  for(let lon=-180;lon<=180;lon+=30){const pts=[];for(let lat=-90;lat<=90;lat+=3)pts.push(latLonTo3D(lat,lon,1.003));s.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),gm2));}
+  for(let lat=-60;lat<=60;lat+=30){const pts=[];for(let lon=-180;lon<=180;lon+=3)pts.push(latLonTo3D(lat,lon,1.003));s.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),gm2));}
+  Object.values(countries).forEach(d=>{
+    const pos=latLonTo3D(d.lat,d.lon);
+    const dg=new THREE.SphereGeometry(0.02,12,12);
+    const dm=new THREE.MeshBasicMaterial({color:0xC8922A});
+    const mesh=new THREE.Mesh(dg,dm); mesh.position.copy(pos); s.add(mesh);
+  });
+  (function loop(){requestAnimationFrame(loop);s.rotation.y+=0.006;r2.render(s,cam2);})();
+}
+initSplashGlobe();
+
+// ─── APP LOGIC ───────────────────────────────────────────────────────────────
+function enterApp() {
+  document.getElementById('splash').style.display='none';
+  document.getElementById('app').classList.add('show');
+  renderSidebar();
+  setTimeout(()=>{ initGlobe(); updateStatus(); }, 50);
+}
+
+function renderSidebar(filter='') {
+  const list = document.getElementById('countryList');
+  list.innerHTML='';
+  Object.entries(countries)
+    .filter(([k,v])=>k.toLowerCase().includes(filter.toLowerCase())||v.dishes.some(d=>d.name.toLowerCase().includes(filter.toLowerCase())))
+    .forEach(([k,v])=>{
+      const row=document.createElement('div');
+      row.className='country-row'+(currentCountry===k?' active':'');
+      row.innerHTML=`<span class="c-flag">${v.flag}</span><div class="c-info"><div class="c-name">${k}</div><div class="c-count">${v.dishes.map(d=>d.name).join(' · ')}</div></div>`;
+      row.onclick=()=>selectCountry(k);
+      list.appendChild(row);
+    });
+}
+
+function selectCountry(name) {
+  currentCountry=name;
+  activeDishIndex=0;
+  renderSidebar(document.getElementById('searchIn')?.value||'');
+  document.getElementById('mapHint').style.opacity='0';
+  openRecipeModal(name, 0);
+}
+
+function openRecipeModal(countryName, dishIdx) {
+  const cData = countries[countryName];
+  const d = cData.dishes[dishIdx];
+  activeDishIndex = dishIdx;
+
+  document.getElementById('rmFlag').textContent = cData.flag;
+  document.getElementById('rmCuisine').textContent = d.cuisine;
+  document.getElementById('rmDishName').textContent = d.name;
+  document.getElementById('rmCountryLine').textContent = cData.flag + ' ' + countryName + ' · ' + cData.capital;
+  document.getElementById('rmEmoji').textContent = d.emoji;
+
+  const tabsSec = document.getElementById('rmDishSelectorSection');
+  const tabs = document.getElementById('rmDishTabs');
+  if(cData.dishes.length > 1) {
+    tabsSec.style.display = '';
+    tabs.innerHTML = cData.dishes.map((dish,i)=>`<div class="rm-dish-tab${i===dishIdx?' active':''}" onclick="openRecipeModal('${countryName}',${i})">${dish.emoji} ${dish.name}</div>`).join('');
+  } else {
+    tabsSec.style.display = 'none';
+  }
+
+  document.getElementById('rmNutri').innerHTML = d.nutri.map(n=>'<div class="rm-nutri-card"><div class="rm-nutri-val">'+n.v+'</div><div class="rm-nutri-lbl">'+n.l+'</div></div>').join('');
+  const cal = parseInt(d.nutri[0].v);
+  document.getElementById('rmCalorieFill').style.width = Math.min(100,Math.round(cal/2000*100))+'%';
+  document.getElementById('rmCalorieNote').textContent = cal+' kcal = '+Math.min(100,Math.round(cal/2000*100))+'% of a typical 2,000 kcal daily intake';
+
+  document.getElementById('rmIng').innerHTML = d.ing.map(i=>'<div class="rm-ing-row">'+i+'</div>').join('');
+
+  document.getElementById('rmSteps').innerHTML = d.steps.map((s,i)=>'<div class="rm-step-row"><div class="rm-step-num">'+(i+1)+'</div><div class="rm-step-body"><div class="rm-step-title">'+s.t+'</div><div class="rm-step-desc">'+s.d+'</div>'+(s.time?'<div class="rm-step-time">'+s.time+'</div>':'')+'</div></div>').join('');
+
+  document.getElementById('rmFact').textContent = d.fact;
+
+  updateModalFavBtn();
+  const modal = document.getElementById('recipeModal');
+  if(modal.parentElement !== document.body) document.body.appendChild(modal);
+  modal.classList.add('open');
+  document.querySelectorAll('.rm-col').forEach(c=>c.scrollTop=0);
+}
+
+function closeRecipeModal() {
+  document.getElementById('recipeModal').classList.remove('open');
+}
+
+function handleModalBgClick(e) {
+  if(e.target === document.getElementById('recipeModal')) closeRecipeModal();
+}
+
+function updateModalFavBtn() {
+  const b = document.getElementById('rmFavBtn');
+  if(!b) return;
+  if(favourites.has(currentCountry)){
+    b.innerHTML='\u2764\uFE0F Saved!'; b.style.background='#4A7A5C';
+  } else {
+    b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke-width="2" width="14" height="14" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> Save to favourites';
+    b.style.background='';
+  }
+}
+
+function toggleFavModal() {
+  if(!currentCountry) return;
+  if(favourites.has(currentCountry)) favourites.delete(currentCountry);
+  else favourites.add(currentCountry);
+  updateModalFavBtn(); updateFavBtn(); updateOverlayFavBtn();
+  document.getElementById('favCount').textContent = favourites.size;
+}
+
+function exportRecipeModal() {
+  if(!currentCountry) return;
+  doExport(currentCountry, activeDishIndex);
+}
+
+function renderDishPanel(countryName, dishIdx, isOverlay) {
+  const prefix = isOverlay ? 'od' : 'd';
+  const cData=countries[countryName];
+  const d=cData.dishes[dishIdx];
+  if(isOverlay) activeDishIndex=dishIdx;
+  else activeDishIndex=dishIdx;
+
+  const cuisine = document.getElementById(prefix+'Cuisine');
+  const name = document.getElementById(prefix+'Name');
+  const country = document.getElementById(prefix+'Country');
+  const emoji = document.getElementById(prefix+'Emoji');
+  if(cuisine) cuisine.textContent=d.cuisine;
+  if(name) name.textContent=d.name;
+  if(country) country.textContent=`${cData.flag} ${countryName}`;
+  if(emoji) emoji.textContent=d.emoji;
+
+  // Multi-dish tabs
+  const tabsSec = document.getElementById(prefix+'DishSelectorSection')||document.getElementById('dishSelectorSection');
+  const tabs = document.getElementById(prefix+'DishTabs')||document.getElementById('dishTabs');
+  if(tabsSec && tabs) {
+    if(cData.dishes.length>1) {
+      tabsSec.style.display='';
+      tabs.innerHTML=cData.dishes.map((dish,i)=>`<div class="dish-tab${i===dishIdx?' active':''}" onclick="renderDishPanel('${countryName}',${i},${isOverlay})">${dish.emoji} ${dish.name}</div>`).join('');
+    } else {
+      tabsSec.style.display='none';
+    }
+  }
+
+  // Nutrition
+  const nutri = document.getElementById(prefix+'Nutri')||document.getElementById('dNutri');
+  const calFill = document.getElementById(prefix+'CalorieFill')||document.getElementById('calorieFill');
+  const calNote = document.getElementById(prefix+'CalorieNote')||document.getElementById('calorieNote');
+  if(nutri) nutri.innerHTML=d.nutri.map(n=>`<div class="nutri-card"><div class="nutri-val">${n.v}</div><div class="nutri-lbl">${n.l}</div></div>`).join('');
+  if(calFill){ const cal=parseInt(d.nutri[0].v); calFill.style.width=Math.min(100,Math.round(cal/2000*100))+'%'; }
+  if(calNote){ const cal=parseInt(d.nutri[0].v); calNote.textContent=`${cal} kcal = ${Math.min(100,Math.round(cal/2000*100))}% of a typical 2,000 kcal daily intake`; }
+
+  // Ingredients
+  const ing = document.getElementById(prefix+'Ing')||document.getElementById('dIng');
+  if(ing) ing.innerHTML=d.ing.map(i=>`<div class="ing-row">${i}</div>`).join('');
+
+  // Steps
+  const steps = document.getElementById(prefix+'Steps')||document.getElementById('dSteps');
+  if(steps) steps.innerHTML=d.steps.map((s,i)=>`<div class="step-row"><div class="step-num">${i+1}</div><div><div class="step-text"><strong>${s.t}</strong> — ${s.d}</div>${s.time?`<div class="step-time">${s.time}</div>`:''}</div></div>`).join('');
+
+  // Fact
+  const fact = document.getElementById(prefix+'Fact')||document.getElementById('dFact');
+  if(fact) fact.textContent=d.fact;
+}
+
+// ─── VIEW SWITCHING ──────────────────────────────────────────────────────────
+function switchView(view) {
+  currentView = view;
+  const globeView = document.getElementById('globeView');
+  const flatMapView = document.getElementById('flatMapView');
+  const btnGlobe = document.getElementById('btnGlobe');
+  const btnMap = document.getElementById('btnMap');
+
+  if(view === 'globe') {
+    globeView.style.display='flex';
+    flatMapView.classList.remove('visible');
+    btnGlobe.classList.add('active-view');
+    btnMap.classList.remove('active-view');
+    document.getElementById('rotateLabel').parentElement.style.display='';
+  } else {
+    globeView.style.display='none';
+    flatMapView.classList.add('visible');
+    btnGlobe.classList.remove('active-view');
+    btnMap.classList.add('active-view');
+    document.getElementById('rotateLabel').parentElement.style.display='none';
+    if(!mapSvg) initWorldMap();
+  }
+}
+
+function zoomIn() {
+  if(currentView==='globe'){ cameraDistance=Math.max(1.6,cameraDistance-0.3); camera.position.z=cameraDistance; }
+  else if(mapZoom && mapSvg){ mapSvg.transition().call(mapZoom.scaleBy, 1.4); }
+}
+function zoomOut() {
+  if(currentView==='globe'){ cameraDistance=Math.min(5,cameraDistance+0.3); camera.position.z=cameraDistance; }
+  else if(mapZoom && mapSvg){ mapSvg.transition().call(mapZoom.scaleBy, 0.7); }
+}
+function resetView() {
+  if(currentView==='globe'){ scene.rotation.set(0,0,0); cameraDistance=2.5; camera.position.z=cameraDistance; }
+  else if(mapZoom && mapSvg){ mapSvg.transition().call(mapZoom.transform, d3.zoomIdentity); }
+}
+
+// ─── 3D GLOBE ────────────────────────────────────────────────────────────────
+function initGlobe() {
+  const container = document.getElementById('globeView');
+  const w=container.clientWidth, h=container.clientHeight;
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, w/h, 0.1, 100);
+  camera.position.z = cameraDistance;
+  renderer = new THREE.WebGLRenderer({canvas:document.getElementById('globeCanvas'),antialias:true,alpha:true});
+  renderer.setSize(w,h);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setClearColor(0x000000,0);
+  scene.add(new THREE.AmbientLight(0xffffff,0.3));
+  const sun=new THREE.DirectionalLight(0xffe4b5,1.2); sun.position.set(5,3,5); scene.add(sun);
+  const fill=new THREE.DirectionalLight(0x4466aa,0.4); fill.position.set(-5,-3,-5); scene.add(fill);
+  const geo=new THREE.SphereGeometry(1,64,64);
+  const oceanMat=new THREE.MeshPhongMaterial({color:0x071628,shininess:60,specular:new THREE.Color(0x1a3a5c)});
+  scene.add(new THREE.Mesh(geo,oceanMat));
+  const atmMat=new THREE.MeshPhongMaterial({color:0x1a4a6a,transparent:true,opacity:0.12,side:THREE.BackSide});
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(1.05,64,64),atmMat));
+  const gridMat=new THREE.LineBasicMaterial({color:0xC8922A,transparent:true,opacity:0.06});
+  for(let lon=-180;lon<=180;lon+=30){const pts=[];for(let lat=-90;lat<=90;lat+=2)pts.push(latLonTo3D(lat,lon,1.005));scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),gridMat));}
+  for(let lat=-60;lat<=60;lat+=30){const pts=[];for(let lon=-180;lon<=180;lon+=2)pts.push(latLonTo3D(lat,lon,1.005));scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),gridMat));}
+
+  raycaster=new THREE.Raycaster(); mouse3d=new THREE.Vector2(); countryMarkers=[];
+  Object.entries(countries).forEach(([name,data])=>{
+    const pos=latLonTo3D(data.lat,data.lon);
+    const ringGeo=new THREE.RingGeometry(0.028,0.042,32);
+    const ringMat=new THREE.MeshBasicMaterial({color:0xC8922A,transparent:true,opacity:0.5,side:THREE.DoubleSide});
+    const ring=new THREE.Mesh(ringGeo,ringMat);
+    ring.position.copy(pos); ring.lookAt(0,0,0); ring.userData={country:name}; scene.add(ring);
+    const dotMat=new THREE.MeshBasicMaterial({color:0xE8B04A});
+    const dot=new THREE.Mesh(new THREE.SphereGeometry(0.018,16,16),dotMat);
+    dot.position.copy(pos); dot.userData={country:name,isMarker:true}; scene.add(dot);
+    countryMarkers.push({dot,ring,name,pos});
+  });
+
+  const canvas=renderer.domElement;
+  canvas.addEventListener('mousedown',onMouseDown);
+  canvas.addEventListener('mousemove',onMouseMove);
+  canvas.addEventListener('mouseup',onMouseUp);
+  canvas.addEventListener('wheel',onWheel,{passive:true});
+  canvas.addEventListener('click',onGlobeClick);
+  canvas.addEventListener('mouseleave',()=>{ isDragging=false; });
+  window.addEventListener('resize',onResize);
+  animate();
+}
+
+function onResize() {
+  if(!renderer) return;
+  const c=document.getElementById('globeView');
+  const w=c.clientWidth, h=c.clientHeight;
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+  renderer.setSize(w,h);
+}
+
+function onMouseDown(e){ isDragging=true; prevMouse={x:e.clientX,y:e.clientY}; rotateVelocity={x:0,y:0}; }
+function onMouseUp(){ isDragging=false; }
+function onMouseMove(e) {
+  if(!isDragging){ updateGlobeTooltip(e); return; }
+  const dx=e.clientX-prevMouse.x, dy=e.clientY-prevMouse.y;
+  scene.rotation.y+=dx*0.005; scene.rotation.x+=dy*0.005;
+  rotateVelocity={x:dy*0.005,y:dx*0.005}; prevMouse={x:e.clientX,y:e.clientY};
+}
+function updateGlobeTooltip(e) {
+  const canvas=renderer.domElement;
+  const rect=canvas.getBoundingClientRect();
+  mouse3d.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse3d.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse3d,camera);
+  const hits=raycaster.intersectObjects(countryMarkers.map(m=>m.dot));
+  const tooltip=document.getElementById('countryTooltip');
+  if(hits.length>0){
+    const name=hits[0].object.userData.country;
+    const d=countries[name];
+    tooltip.innerHTML=`${d.flag} <strong>${name}</strong> — ${d.dishes.map(x=>x.name).join(', ')}`;
+    tooltip.style.display='block';
+    tooltip.style.left=(e.clientX-rect.left+14)+'px';
+    tooltip.style.top=(e.clientY-rect.top-40)+'px';
+    canvas.style.cursor='pointer';
+  } else { tooltip.style.display='none'; canvas.style.cursor='grab'; }
+}
+function onGlobeClick(e) {
+  if(Math.abs(rotateVelocity.x)>0.01||Math.abs(rotateVelocity.y)>0.01) return;
+  const canvas=renderer.domElement;
+  const rect=canvas.getBoundingClientRect();
+  mouse3d.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse3d.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse3d,camera);
+  const hits=raycaster.intersectObjects(countryMarkers.map(m=>m.dot));
+  if(hits.length>0) selectCountry(hits[0].object.userData.country);
+}
+function onWheel(e) {
+  cameraDistance+=e.deltaY*0.003;
+  cameraDistance=Math.max(1.6,Math.min(5,cameraDistance));
+  camera.position.z=cameraDistance;
+}
+let t=0;
+function animate() {
+  requestAnimationFrame(animate); t+=0.016;
+  if(autoRotate&&!isDragging) scene.rotation.y+=0.003;
+  if(!isDragging){ scene.rotation.y+=rotateVelocity.y; scene.rotation.x+=rotateVelocity.x; rotateVelocity.x*=0.95; rotateVelocity.y*=0.95; }
+  countryMarkers.forEach((m,i)=>{
+    const pulse=0.85+0.15*Math.sin(t*2+i*0.8);
+    m.ring.material.opacity=m.name===currentCountry?0.9:0.4*pulse;
+    m.ring.scale.setScalar(m.name===currentCountry?1.4:1.0);
+    m.dot.material.color.setHex(m.name===currentCountry?0xFFD700:0xE8B04A);
+  });
+  renderer.render(scene,camera);
+}
+
+// ─── WORLD MAP (D3) ──────────────────────────────────────────────────────────
+async function initWorldMap() {
+  const svgEl = document.getElementById('worldMapSvg');
+  const wrap = svgEl.parentElement;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  svgEl.setAttribute('viewBox',`0 0 ${W} ${H}`);
+
+  mapSvg = d3.select('#worldMapSvg');
+
+  // Ocean background
+  mapSvg.append('rect').attr('class','sphere-bg').attr('width',W).attr('height',H);
+
+  const g = mapSvg.append('g').attr('class','map-g');
+
+  mapProjection = d3.geoNaturalEarth1()
+    .scale(W/6.3)
+    .translate([W/2, H/2]);
+
+  const path = d3.geoPath().projection(mapProjection);
+
+  // Graticule
+  const graticule = d3.geoGraticule()();
+  g.append('path').datum(graticule).attr('class','graticule').attr('d',path);
+
+  // Load world topo JSON
+  try {
+    const topo = await d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+    worldGeoData = topo;
+    const countries110 = topojson.feature(topo, topo.objects.countries);
+    const tooltip = document.getElementById('mapTooltip');
+
+    // Country name lookup by numeric ID
+    const numericToName = {};
+    const numericToISO = {};
+    // Hardcoded numeric ISO codes for our countries
+    const isoNumericMap = {
+      '524':'NPL','392':'JPN','356':'IND','156':'CHN',
+      '410':'KOR','764':'THA','380':'ITA','484':'MEX',
+      '250':'FRA','840':'USA'
+    };
+    Object.entries(isoNumericMap).forEach(([num,iso])=>{
+      if(isoToCountry[iso]) numericToName[num]=isoToCountry[iso];
+    });
+
+    g.selectAll('.land')
+      .data(countries110.features)
+      .enter().append('path')
+      .attr('class',d=>{
+        const name=numericToName[d.id];
+        return 'land'+(name?' has-data':'');
+      })
+      .attr('d',path)
+      .attr('data-country',d=>numericToName[d.id]||'')
+      .on('mouseover',function(event,d){
+        const name=numericToName[d.id];
+        if(name){
+          tooltip.style.display='block';
+          const cd=countries[name];
+          tooltip.innerHTML=`${cd.flag} <strong>${name}</strong><br><span style="color:var(--text2);font-size:11px">${cd.dishes.map(x=>x.name).join(' · ')}</span>`;
+        } else {
+          tooltip.style.display='none';
+        }
+      })
+      .on('mousemove',function(event){
+        tooltip.style.left=(event.clientX+14)+'px';
+        tooltip.style.top=(event.clientY-40)+'px';
+      })
+      .on('mouseout',function(){ tooltip.style.display='none'; })
+      .on('click',function(event,d){
+        const name=numericToName[d.id];
+        if(name) openCountryOnMap(name, d);
+      });
+
+    // Highlight current selected country
+    if(currentCountry) highlightMapCountry(currentCountry);
+
+    // Add pulsing dots for each country
+    const dotsG = mapSvg.append('g').attr('class','dots-g');
+    Object.entries(countries).forEach(([name,data])=>{
+      const [x,y] = mapProjection([data.lon,data.lat]);
+      // Outer ring (pulsing)
+      dotsG.append('circle')
+        .attr('class','map-dot-ring')
+        .attr('cx',x).attr('cy',y).attr('r',8)
+        .attr('fill','none').attr('stroke','var(--gold)').attr('stroke-width',1.5)
+        .style('pointer-events','none');
+      // Core dot
+      dotsG.append('circle')
+        .attr('class','map-dot')
+        .attr('cx',x).attr('cy',y).attr('r',5)
+        .attr('fill','var(--gold2)').attr('stroke','var(--bg)').attr('stroke-width',1.5)
+        .style('cursor','pointer')
+        .on('click',()=>openCountryOnMap(name, null))
+        .on('mouseover',function(event){
+          const cd=countries[name];
+          tooltip.style.display='block';
+          tooltip.innerHTML=`${cd.flag} <strong>${name}</strong><br><span style="color:var(--text2);font-size:11px">${cd.dishes.map(x=>x.name).join(' · ')}</span>`;
+        })
+        .on('mousemove',function(event){ tooltip.style.left=(event.clientX+14)+'px'; tooltip.style.top=(event.clientY-40)+'px'; })
+        .on('mouseout',()=>{ tooltip.style.display='none'; });
+      // Label
+      dotsG.append('text')
+        .attr('class','country-label')
+        .attr('x',x+8).attr('y',y+4)
+        .text(name)
+        .style('pointer-events','none');
+    });
+
+  } catch(e) {
+    // Fallback: just show dots with no land
+    mapSvg.append('text').attr('x','50%').attr('y','50%').attr('text-anchor','middle').attr('fill','var(--muted)').attr('font-size','12').text('Click a glowing dot to explore');
+  }
+
+  // Zoom
+  mapZoom = d3.zoom()
+    .scaleExtent([0.8, 10])
+    .on('zoom', (event)=>{ g.attr('transform', event.transform); });
+  mapSvg.call(mapZoom);
+}
+
+function highlightMapCountry(name) {
+  if(!mapSvg) return;
+  mapSvg.selectAll('.land').classed('selected', d => {
+    const isoNumericMap={'524':'NPL','392':'JPN','356':'IND','156':'CHN','410':'KOR','764':'THA','380':'ITA','484':'MEX','250':'FRA','840':'USA'};
+    const numericToName={};
+    Object.entries(isoNumericMap).forEach(([num,iso])=>{ if(isoToCountry[iso]) numericToName[num]=isoToCountry[iso]; });
+    return numericToName[d.id] === name;
+  });
+}
+
+// ─── COUNTRY MAP OVERLAY ─────────────────────────────────────────────────────
+function openCountryOnMap(name, feature) {
+  currentCountry = name;
+  renderSidebar(document.getElementById('searchIn')?.value||'');
+  // Also update right panel
+  document.getElementById('emptyState').style.display='none';
+  document.getElementById('detailContent').style.display='flex';
+  renderDishPanel(name, 0, false);
+  updateFavBtn();
+  highlightMapCountry(name);
+
+  // Show overlay
+  const overlay = document.getElementById('countryDetailOverlay');
+  const cd = countries[name];
+
+  document.getElementById('overlayFlag').textContent = cd.flag;
+  document.getElementById('overlayCountryName').textContent = name;
+
+  // Render country stats
+  document.getElementById('countryMapInfo').innerHTML = `
+    <div class="cmi-item"><div class="cmi-val">${cd.capital}</div><div class="cmi-lbl">Capital</div></div>
+    <div class="cmi-item"><div class="cmi-val">${cd.population}</div><div class="cmi-lbl">Population</div></div>
+    <div class="cmi-item"><div class="cmi-val">${cd.area}</div><div class="cmi-lbl">Area</div></div>
+  `;
+  document.getElementById('countryMapLabel').textContent = `${cd.flag} ${name}`;
+
+  // Draw country shape
+  drawCountryShape(name, cd);
+
+  // Render dish info in overlay
+  renderDishPanel(name, 0, true);
+  updateOverlayFavBtn();
+
+  overlay.classList.add('visible');
+  requestAnimationFrame(()=>{ overlay.classList.add('shown'); });
+}
+
+function drawCountryShape(name, cd) {
+  const svgEl = document.getElementById('countryMapSvg');
+  const W = 380, H = 280;
+  const svg = d3.select('#countryMapSvg');
+  svg.selectAll('*').remove();
+
+  svg.append('rect').attr('rx',4).attr('width',W).attr('height',H)
+    .attr('fill','rgba(7,22,40,0.6)').attr('stroke','rgba(200,146,42,0.15)').attr('stroke-width',1);
+
+  if(!worldGeoData) {
+    // Fallback: show flag + name
+    svg.append('text').attr('x',W/2).attr('y',H/2-20).attr('text-anchor','middle')
+      .attr('font-size','60').text(cd.flag);
+    svg.append('text').attr('x',W/2).attr('y',H/2+40).attr('text-anchor','middle')
+      .attr('fill','var(--cream)').attr('font-family','Cormorant Garamond,serif').attr('font-size','28').attr('font-weight','700').text(name);
+    return;
+  }
+
+  const isoNumericMap={'524':'NPL','392':'JPN','356':'IND','156':'CHN','410':'KOR','764':'THA','380':'ITA','484':'MEX','250':'FRA','840':'USA'};
+  const targetNum = Object.entries(isoNumericMap).find(([num,iso])=>iso===cd.iso)?.[0];
+
+  const countries110 = topojson.feature(worldGeoData, worldGeoData.objects.countries);
+  const feature = countries110.features.find(f=>String(f.id)===targetNum);
+
+  if(!feature) {
+    svg.append('text').attr('x',W/2).attr('y',H/2-20).attr('text-anchor','middle').attr('font-size','60').text(cd.flag);
+    svg.append('text').attr('x',W/2).attr('y',H/2+40).attr('text-anchor','middle').attr('fill','var(--cream)').attr('font-family','Cormorant Garamond,serif').attr('font-size','24').text(name);
+    return;
+  }
+
+  const proj = d3.geoMercator().fitSize([W-40, H-60], feature).translate([W/2, H/2+5]);
+  const pathFn = d3.geoPath().projection(proj);
+
+  // Glow filter
+  const defs = svg.append('defs');
+  const filter = defs.append('filter').attr('id','glow-filter').attr('x','-50%').attr('y','-50%').attr('width','200%').attr('height','200%');
+  filter.append('feGaussianBlur').attr('stdDeviation','4').attr('result','coloredBlur');
+  const feMerge = filter.append('feMerge');
+  feMerge.append('feMergeNode').attr('in','coloredBlur');
+  feMerge.append('feMergeNode').attr('in','SourceGraphic');
+
+  // Glow shadow
+  svg.append('path').datum(feature).attr('d',pathFn)
+    .attr('fill','rgba(200,146,42,0.12)')
+    .attr('stroke','rgba(200,146,42,0.3)')
+    .attr('stroke-width',3)
+    .attr('filter','url(#glow-filter)');
+
+  // Main shape
+  svg.append('path').datum(feature).attr('d',pathFn)
+    .attr('fill','rgba(30,53,32,0.9)')
+    .attr('stroke','var(--gold)')
+    .attr('stroke-width',1.5);
+
+  // Capital dot
+  const [cx,cy] = proj([cd.lon, cd.lat]);
+  if(cx>=0&&cx<=W&&cy>=0&&cy<=H){
+    svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',5)
+      .attr('fill','var(--gold2)').attr('stroke','var(--bg)').attr('stroke-width',2);
+    svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',10)
+      .attr('fill','none').attr('stroke','var(--gold)').attr('stroke-width',1).attr('opacity',0.5);
+  }
+}
+
+function closeCountryOverlay() {
+  const overlay = document.getElementById('countryDetailOverlay');
+  overlay.classList.remove('shown');
+  setTimeout(()=>{ overlay.classList.remove('visible'); }, 300);
+}
+
+// ─── FAV & EXPORT ────────────────────────────────────────────────────────────
+function updateFavBtn() {
+  const b=document.getElementById('favBtn');
+  if(favourites.has(currentCountry)){
+    b.innerHTML=`<svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> Saved!`;
+    b.style.background='#4A7A5C';
+  } else {
+    b.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke-width="2" width="12" height="12" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> Save to favourites`;
+    b.style.background='';
+  }
+}
+function updateOverlayFavBtn() {
+  const b=document.getElementById('odFavBtn');
+  if(!b) return;
+  if(favourites.has(currentCountry)){
+    b.innerHTML=`❤️ Saved!`; b.style.background='#4A7A5C';
+  } else {
+    b.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke-width="2" width="12" height="12" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> Save`;
+    b.style.background='';
+  }
+}
+function toggleFav() {
+  if(!currentCountry) return;
+  if(favourites.has(currentCountry)) favourites.delete(currentCountry);
+  else favourites.add(currentCountry);
+  updateFavBtn(); updateOverlayFavBtn();
+  document.getElementById('favCount').textContent=favourites.size;
+}
+function toggleFavOverlay() { toggleFav(); }
+function showFavourites() {
+  if(favourites.size===0){ alert('No favourites saved yet!'); return; }
+  alert('Favourites:\n'+[...favourites].map(c=>`${countries[c].flag} ${c} — ${countries[c].dishes.map(d=>d.name).join(', ')}`).join('\n'));
+}
+function exportRecipe() {
+  if(!currentCountry) return;
+  doExport(currentCountry, activeDishIndex);
+}
+function exportRecipeOverlay() {
+  if(!currentCountry) return;
+  doExport(currentCountry, activeDishIndex);
+}
+function doExport(countryName, dishIdx) {
+  const c=countries[countryName], d=c.dishes[dishIdx];
+  let txt=`GLOBEBITE RECIPE EXPORT\n${'='.repeat(40)}\n`;
+  txt+=`Country: ${countryName} ${c.flag}\nDish: ${d.name}\nCuisine: ${d.cuisine}\n\nNUTRITION\n${'-'.repeat(30)}\n`;
+  d.nutri.forEach(n=>txt+=`${n.l}: ${n.v}\n`);
+  txt+=`\nINGREDIENTS\n${'-'.repeat(30)}\n`;
+  d.ing.forEach(i=>txt+=`• ${i}\n`);
+  txt+=`\nINSTRUCTIONS\n${'-'.repeat(30)}\n`;
+  d.steps.forEach((s,i)=>txt+=`${i+1}. ${s.t}\n   ${s.d}${s.time?` (${s.time})`:''}\n\n`);
+  txt+=`FUN FACT\n${'-'.repeat(30)}\n${d.fact}\n\nExported from GlobeBite v2.1\n`;
+  const blob=new Blob([txt],{type:'text/plain'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`${d.name.replace(/\s+/g,'_')}_recipe.txt`; a.click();
+}
+
+function toggleAutoRotate() {
+  autoRotate=!autoRotate;
+  document.getElementById('rotateLabel').textContent=autoRotate?'Auto-rotate':'Paused';
+}
+function doSearch() { renderSidebar(document.getElementById('searchIn').value); }
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeRecipeModal(); });
+
+function updateStatus() {
+  const total=Object.values(countries).reduce((a,c)=>a+c.dishes.length,0);
+  document.getElementById('statusCount').textContent=`${Object.keys(countries).length} countries · ${total} dishes loaded`;
+}
+</script>
+</body>
+</html>
