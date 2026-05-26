@@ -1,0 +1,1 @@
+Same as Frontend 1 — your job is the UI side of things. Get Qt Creator installed and running, play around with basic widgets like buttons, labels and layouts so you're comfortable with how Qt works. We'll figure out who does which screen soon, for now just get your environment ready.
